@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin — Config Builder</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <header>
+    <div class="header-content">
+      <div class="header-left">
+        <div class="logo-icon admin-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="12" y1="18" x2="12" y2="12"/>
+            <line x1="9" y1="15" x2="15" y2="15"/>
+          </svg>
+        </div>
+        <div>
+          <h1>Admin &mdash; Config Builder</h1>
+          <p>Upload Excel, review config, test, approve</p>
+        </div>
+      </div>
+      <a href="index.html" class="header-badge">Back</a>
+    </div>
+  </header>
+
+  <div class="admin-container">
+
+    <!-- Step 1: Upload -->
+    <div class="step-panel">
+      <div class="step-header">
+        <span class="step-num">1</span>
+        <h2>Upload Excel</h2>
+      </div>
+      <div class="step-body">
+        <p class="step-desc">Excel must contain a <code>_Schema</code> sheet declaring inputs and outputs.</p>
+        <div class="upload-row">
+          <input type="file" id="file-input" accept=".xlsx,.xls">
+          <button id="upload-btn" onclick="uploadExcel()">Upload &amp; Parse</button>
+        </div>
+        <div id="upload-status" class="step-status"></div>
+      </div>
+    </div>
+
+    <!-- Step 2: Review parsed config -->
+    <div class="step-panel" id="step-review" style="display:none">
+      <div class="step-header">
+        <span class="step-num">2</span>
+        <h2>Review Config</h2>
+      </div>
+      <div class="step-body">
+        <div id="config-summary" class="config-summary"></div>
+
+        <h3 class="sub-heading">Inputs</h3>
+        <div class="table-scroll">
+          <table id="inputs-table" class="config-table">
+            <thead><tr><th>Field</th><th>Cell</th><th>Type</th><th>Label</th><th>Group</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+
+        <h3 class="sub-heading">Outputs</h3>
+        <div class="table-scroll">
+          <table id="outputs-table" class="config-table">
+            <thead><tr><th>Field</th><th>Cell</th><th>Label</th><th>Primary</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: Test Calculate -->
+    <div class="step-panel" id="step-test" style="display:none">
+      <div class="step-header">
+        <span class="step-num">3</span>
+        <h2>Test Calculate</h2>
+      </div>
+      <div class="step-body">
+        <div class="rater-layout">
+          <div class="panel" id="test-input-panel">
+            <div class="panel-header"><h2>Inputs</h2></div>
+            <div id="test-form-container"></div>
+          </div>
+          <div class="panel" id="test-output-panel">
+            <div class="panel-header"><h2>Outputs</h2></div>
+            <div id="test-output-container"></div>
+            <button id="test-calc-btn" onclick="testCalculate()">Test Calculate</button>
+            <button id="test-download-btn" onclick="testDownload()" class="download-btn">Download Calculated Excel</button>
+            <div id="test-status" class="step-status"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Approve & Save -->
+    <div class="step-panel" id="step-save" style="display:none">
+      <div class="step-header">
+        <span class="step-num">4</span>
+        <h2>Approve &amp; Save</h2>
+      </div>
+      <div class="step-body">
+        <label>Rater Slug (URL-safe ID)
+          <input type="text" id="rater-slug" placeholder="e.g. mpl-old-republic">
+        </label>
+        <label>Display Name
+          <input type="text" id="rater-name" placeholder="e.g. MPL Rater - Old Republic">
+        </label>
+        <label>Description
+          <input type="text" id="rater-desc" placeholder="Short description">
+        </label>
+        <button id="save-btn" class="approve-btn" onclick="saveRater()">Approve &amp; Save to Raters</button>
+        <div id="save-status" class="step-status"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer><p>Excel Rater System v2.0 &middot; Admin Mode</p></footer>
+
+  <script src="app.js"></script>
+  <script src="admin.js"></script>
+</body>
+</html>
