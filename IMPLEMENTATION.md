@@ -108,14 +108,15 @@ Single function, zero hardcoded references:
 ```python
 def calculate(template_path: Path, config: dict, input_data: dict, keep_file=False) -> dict
     # 1. copy template_path → /tmp/<uuid>.xlsx
-    # 2. open with openpyxl, write inputs per config["inputs"] cell mappings
-    # 3. LibreOffice recalculate
-    # 4. read outputs per config["outputs"] cell mappings
-    # 5. cleanup
+    # 2. open with openpyxl, write flat inputs per config["inputs"] OR schedule arrays per config["schedules"]
+    # 3. IF mode: "schedule", clear/zero-out un-provided rows in bounds to prevent false premium artifacts
+    # 4. LibreOffice recalculate
+    # 5. read outputs per config["outputs"] cell mappings
+    # 6. cleanup
     # Returns: {field: value for each output}
 ```
 
-Config tells engine everything — sheet name, input cells, output cells.
+Config tells engine everything — sheet name, input cells, schedules, output cells.
 Engine knows nothing about MPL or any specific rater.
 
 #### Step 1.4 — Create schema_parser.py
@@ -127,7 +128,10 @@ def parse_schema(xlsx_path: Path) -> dict
     # 2. find sheet named "_Schema"
     # 3. read rows: field, cell, type, label, direction, group, options, default
     # 4. split into inputs[] and outputs[]
-    # 5. return config dict (same format as config.json)
+    # 5. Auto-Discovery Injector: Call `_inject_schedule_mode(config)`
+    #    - Groups repeating column sequences into arrays if sequential rows matching heuristics are found.
+    #    - Applies "mode: schedule" and generates schedules metadata map automatically.
+    # 6. return config dict (hybrid format: flat or schedule-based depending on findings)
     # Raises ValueError if _Schema sheet not found
 ```
 
@@ -186,20 +190,22 @@ Layout:
 Core function:
 ```javascript
 function renderForm(config) {
-    // 1. group inputs by config.inputs[].group
-    // 2. for each group, create a panel
-    // 3. for each input in group:
+    // 1. check mode config.mode === "schedule"
+    //    → if schedule: group inputs by schedule map logic, render Add/Remove Row tables
+    // 2. group flat inputs by config.inputs[].group
+    // 3. for each group (flat or schedule), create a panel
+    // 4. for each input in group:
     //    - type "text"     → <input type="text">
     //    - type "number"   → <input type="number">
     //    - type "dropdown" → <select> with config.inputs[].options
     //    - set default from config.inputs[].default
-    // 4. render output panel:
+    // 5. render output panel:
     //    - find primary output (primary: true)
     //    - list secondary outputs in breakdown table
 }
 
 function collectInputs(config) {
-    // read all form values, return {field: value} dict
+    // read all form values, return {field: value} dict AND schedules obj
     // uses config to know which fields exist and their types
 }
 

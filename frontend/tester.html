@@ -130,7 +130,9 @@
         renderForm(document.getElementById("form-container"), currentConfig);
         renderOutputPanel(document.getElementById("output-container"), currentConfig);
         document.getElementById("step-calculate").style.display = "block";
-        statusEl.textContent = "Loaded from " + currentSource + "/" + slug + ": " + currentConfig.inputs.length + " inputs, " + currentConfig.outputs.length + " outputs";
+        const mode = currentConfig.mode || "flat";
+        const scheduleCount = Array.isArray(currentConfig.schedules) ? currentConfig.schedules.length : 0;
+        statusEl.textContent = "Loaded from " + currentSource + "/" + slug + ": mode=" + mode + ", schedules=" + scheduleCount + ", " + currentConfig.inputs.length + " inputs, " + currentConfig.outputs.length + " outputs";
         statusEl.className = "step-status success";
       } catch (e) {
         statusEl.textContent = "Error: " + e.message;

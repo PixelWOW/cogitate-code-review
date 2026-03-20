@@ -3,6 +3,7 @@
 
 import openpyxl
 from pathlib import Path
+import re
 
 
 def parse_schema(xlsx_path: Path) -> dict:
@@ -127,4 +128,101 @@ def parse_schema(xlsx_path: Path) -> dict:
         "outputs": outputs,
     }
 
+    _inject_schedule_mode(config)
     return config
+
+
+def _inject_schedule_mode(config: dict) -> None:
+    """
+    Heuristically infer schedule/repeater blocks from parsed inputs.
+
+    This enables admin-uploaded complex raters to return dynamic schedule
+    metadata without hardcoded, file-specific rules.
+    """
+    inputs = config.get("inputs") or []
+    if not inputs:
+        return
+
+    row_map = {}
+    for inp in inputs:
+        cell = str(inp.get("cell") or "").strip().upper()
+        m = re.match(r"^([A-Z]+)(\d+)$", cell)
+        if not m:
+            continue
+        col, row_txt = m.groups()
+        row = int(row_txt)
+        row_map.setdefault(row, {})[col] = inp
+
+    # Primary schedule heuristic: contiguous ranges in column D.
+    # Many schedule workbooks store location selectors in D and amount cells in E,
+    # but E may be absent from schema rows when defaults are blank/formula-driven.
+    schedule_rows = sorted(r for r, cols in row_map.items() if "D" in cols)
+    if not schedule_rows:
+        return
+
+    blocks = []
+    start = schedule_rows[0]
+    prev = schedule_rows[0]
+    for r in schedule_rows[1:]:
+        if r == prev + 1:
+            prev = r
+            continue
+        blocks.append((start, prev))
+        start = r
+        prev = r
+    blocks.append((start, prev))
+
+    schedules = []
+    for idx, (row_start, row_end) in enumerate(blocks, 1):
+        length = row_end - row_start + 1
+        # Ignore tiny incidental ranges to avoid false positives on simple raters.
+        if length < 3:
+            continue
+
+        d_meta = row_map[row_start].get("D", {})
+
+        e_meta = {}
+        for rr in range(row_start, row_end + 1):
+            if "E" in row_map.get(rr, {}):
+                e_meta = row_map[rr].get("E", {})
+                break
+
+        group_name = str(d_meta.get("group") or "Coverage")
+        key_base = re.sub(r"[^a-z0-9]+", "_", group_name.lower()).strip("_")
+        key = f"{key_base}_{row_start}_{row_end}" if key_base else f"schedule_{idx}"
+
+        schedules.append(
+            {
+                "key": key,
+                "title": f"{group_name} ({row_start}-{row_end})",
+                "rowStart": row_start,
+                "rowEnd": row_end,
+                "allowBlankRows": True,
+                "minActiveRows": 1,
+                "columns": [
+                    {
+                        "field": "location",
+                        "column": "D",
+                        "type": d_meta.get("type", "text"),
+                        "label": str(d_meta.get("label") or "Location #"),
+                    },
+                    {
+                        "field": "expiring_risk_limit",
+                        "column": "E",
+                        "type": e_meta.get("type", "number"),
+                        "label": str(e_meta.get("label") or "Risk Limit"),
+                    },
+                ],
+            }
+        )
+
+    if not schedules:
+        return
+
+    config["mode"] = "schedule"
+    config["writeRules"] = {
+        "clearUnusedRows": True,
+        "emptyCellWrite": "blank",
+        "rowActivePolicy": "any-non-empty-cell",
+    }
+    config["schedules"] = schedules

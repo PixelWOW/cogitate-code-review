@@ -1,5 +1,167 @@
 {
   "sheet": "Inception of Cover Rater",
+  "mode": "schedule",
+  "writeRules": {
+    "clearUnusedRows": true,
+    "emptyCellWrite": "blank",
+    "rowActivePolicy": "any-non-empty-cell"
+  },
+  "schedules": [
+    {
+      "key": "coverage_a",
+      "title": "Coverage A - Dwelling",
+      "rowStart": 9,
+      "rowEnd": 14,
+      "allowBlankRows": true,
+      "minActiveRows": 1,
+      "columns": [
+        {
+          "field": "location",
+          "column": "D",
+          "type": "dropdown",
+          "label": "Location #"
+        },
+        {
+          "field": "expiring_risk_limit",
+          "column": "E",
+          "type": "number",
+          "label": "Expiring Risk Limit"
+        }
+      ]
+    },
+    {
+      "key": "coverage_b",
+      "title": "Coverage B - Private Structures",
+      "rowStart": 16,
+      "rowEnd": 21,
+      "allowBlankRows": true,
+      "minActiveRows": 0,
+      "columns": [
+        {
+          "field": "location",
+          "column": "D",
+          "type": "dropdown",
+          "label": "Location #"
+        },
+        {
+          "field": "expiring_risk_limit",
+          "column": "E",
+          "type": "number",
+          "label": "Expiring Risk Limit"
+        }
+      ]
+    },
+    {
+      "key": "coverage_c_all",
+      "title": "Coverage C - Personal Property (All)",
+      "rowStart": 23,
+      "rowEnd": 28,
+      "allowBlankRows": true,
+      "minActiveRows": 0,
+      "columns": [
+        {
+          "field": "location",
+          "column": "D",
+          "type": "dropdown",
+          "label": "Location #"
+        },
+        {
+          "field": "expiring_risk_limit",
+          "column": "E",
+          "type": "number",
+          "label": "Expiring Risk Limit"
+        }
+      ]
+    },
+    {
+      "key": "coverage_c_jewelry",
+      "title": "Coverage C - Scheduled Jewelry",
+      "rowStart": 30,
+      "rowEnd": 32,
+      "allowBlankRows": true,
+      "minActiveRows": 0,
+      "columns": [
+        {
+          "field": "location",
+          "column": "D",
+          "type": "dropdown",
+          "label": "Location #"
+        },
+        {
+          "field": "expiring_risk_limit",
+          "column": "E",
+          "type": "number",
+          "label": "Expiring Risk Limit"
+        }
+      ]
+    },
+    {
+      "key": "coverage_d",
+      "title": "Coverage D - Loss of Use",
+      "rowStart": 34,
+      "rowEnd": 39,
+      "allowBlankRows": true,
+      "minActiveRows": 0,
+      "columns": [
+        {
+          "field": "location",
+          "column": "D",
+          "type": "dropdown",
+          "label": "Location #"
+        },
+        {
+          "field": "expiring_risk_limit",
+          "column": "E",
+          "type": "number",
+          "label": "Expiring Risk Limit"
+        }
+      ]
+    },
+    {
+      "key": "coverage_f",
+      "title": "Coverage F - Scheduled Farm Personal Property",
+      "rowStart": 42,
+      "rowEnd": 61,
+      "allowBlankRows": true,
+      "minActiveRows": 0,
+      "columns": [
+        {
+          "field": "location",
+          "column": "D",
+          "type": "dropdown",
+          "label": "Location #"
+        },
+        {
+          "field": "expiring_risk_limit",
+          "column": "E",
+          "type": "number",
+          "label": "Expiring Risk Limit"
+        }
+      ]
+    },
+    {
+      "key": "coverage_g",
+      "title": "Coverage G - Farm Outbuildings and Structures",
+      "rowStart": 63,
+      "rowEnd": 82,
+      "allowBlankRows": true,
+      "minActiveRows": 0,
+      "columns": [
+        {
+          "field": "location",
+          "column": "D",
+          "type": "dropdown",
+          "label": "Location #"
+        },
+        {
+          "field": "expiring_risk_limit",
+          "column": "E",
+          "type": "number",
+          "label": "Expiring Risk Limit"
+        }
+      ]
+    }
+  ],
   "inputs": [
     {
       "field": "insured_b1",

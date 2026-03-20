@@ -150,52 +150,53 @@ Each request gets its own temp file + LibreOffice process. Zero shared state.
 
 ---
 
-## config.json Format (Per Rater)
+## config.json Format (Dual-Mode / Hybrid Engine)
+
+To support both simple forms and complex repeating tables (e.g., location schedules), the system uses a **Hybrid Configuration Model** (`mode: "flat"` vs `mode: "schedule"`).
+
+### 1. Flat Mode (Standard)
+The default mode. Every input corresponds to exactly one static cell.
 
 ```json
 {
+  "mode": "flat",
   "sheet": "Rater",
+  "writeRules": { "clearUnusedRows": false },
   "inputs": [
     {
       "field": "insured_name",
       "cell": "B1",
       "type": "text",
       "label": "Insured Name",
-      "group": "Client Info",
-      "default": "Test Client"
-    },
-    {
-      "field": "revenue",
-      "cell": "B16",
-      "type": "dropdown",
-      "label": "Annual Revenue",
-      "group": "Rating Inputs",
-      "options": ["$0-$250,000", "$250,001-$500,000", "..."],
-      "default": "$3,000,001-$6,000,000"
-    },
-    {
-      "field": "base_rate",
-      "cell": "B13",
-      "type": "number",
-      "label": "Base Rate",
-      "group": "Rating Inputs",
-      "default": 800.0
+      "group": "Client Info"
     }
   ],
-  "outputs": [
+  "outputs": [...]
+}
+```
+
+### 2. Schedule Mode (Dynamic Table Grouping)
+Used for complex raters like "Oakbridge" where users need to add repeating sets of properties (e.g., Coverages A-F across 5 different locations). The backend zeros out unneeded leftover rows in the Excel template to prevent "ghost" data from calculating.
+
+```json
+{
+  "mode": "schedule",
+  "sheet": "Rating",
+  "writeRules": { "clearUnusedRows": true },
+  "schedules": [
     {
-      "field": "premium",
-      "cell": "B40",
-      "label": "Total Premium",
-      "primary": true
-    },
-    {
-      "field": "final_multiplier",
-      "cell": "B38",
-      "label": "Final Multiplier",
-      "primary": false
+      "name": "Coverage A",
+      "group": "Coverage Data",
+      "rowStart": 9,
+      "rowEnd": 14,
+      "columns": [
+        { "col": "D", "field": "label", "type": "text" },
+        { "col": "E", "field": "amount", "type": "number", "options": [] }
+      ]
     }
-  ]
+  ],
+  "inputs": [ /* Global inputs that don't repeat */ ],
+  "outputs": [ /* Outcomes */ ]
 }
 ```
 

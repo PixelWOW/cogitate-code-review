@@ -666,10 +666,26 @@ footer {
   letter-spacing: 0.5px;
 }
 
+.config-table th::after {
+  content: '';
+  display: block;
+  font-size: 10px;
+  font-weight: normal;
+  text-transform: none;
+  color: var(--text-dim);
+  letter-spacing: normal;
+}
+
 .config-table td {
   padding: 7px 10px;
   border-bottom: 1px solid rgba(42, 46, 59, 0.4);
   color: var(--text);
+}
+
+.config-table input::placeholder,
+.config-table select[title] {
+  font-size: 11px;
+  color: var(--text-dim);
 }
 
 .config-table code {
