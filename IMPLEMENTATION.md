@@ -353,3 +353,42 @@ Shared across all pages: link back to home, current page indicator.
 3. **No file-specific logic** — engine.py works identically for MPL, Homeowners, OAKBRIDGE, anything
 4. **dump/ folder** — all temp scripts, test outputs, throwaway files go here
 5. **One concern per file** — engine calculates, registry discovers, schema_parser parses, main routes
+
+
+
+
+
+
+
+
+
+
+
+
+
+                Upload Excel
+                      │
+        ┌─────────────▼─────────────┐
+        │ Check _Schema present?    │
+        └─────────────┬─────────────┘
+                      │
+         ┌────────────┼────────────┐
+         │                         │
+       YES                        NO
+         │                         │
+         ▼                         ▼
+  Parse config (_Schema)     LLM Parsing
+  → config.json              → RaterSchema
+         │                         │
+         ▼                         ▼
+   Convert → Common Schema ← Convert
+         │
+         ▼
+   Engine Selection Layer
+         │
+   ┌─────┴───────────────┐
+   │                     │
+Formula Engine     Excel Engine
+(Approach 1)       (Approach 2)
+
+
