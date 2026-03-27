@@ -1,5 +1,5 @@
 # backend/registry.py
-# Discovers raters from raters/ and templates/ folders
+# Discovers raters from apps/raters/ and apps/templates/ folders
 
 import json
 from pathlib import Path
@@ -57,7 +57,7 @@ def _get_base_dir(source):
 
 
 def load_config(source, slug):
-    """Load config.json for a rater from either raters/ or templates/ folder."""
+    """Load config.json for a rater from either apps/raters/ or apps/templates/."""
     base = _get_base_dir(source)
     config_file = base / slug / "config.json"
     if not config_file.exists():

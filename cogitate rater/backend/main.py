@@ -8,13 +8,12 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse
 
 import engine
 import registry
 import schema_parser
-from config import UPLOADS_DIR, RATERS_DIR
+from config import UPLOADS_DIR, RATERS_DIR, TEMPLATES_DIR
 
 app = FastAPI(
     title="Excel Rater System",
@@ -32,7 +31,21 @@ app.add_middleware(
 
 @app.get("/")
 def root_redirect():
-    return RedirectResponse(url="/ui/")
+    return RedirectResponse(url="/docs")
+
+
+# ===================================================================
+# HEALTH & STATUS
+# ===================================================================
+
+@app.get("/api/health")
+def health_check():
+    """Health check endpoint for frontend connection testing."""
+    return {
+        "status": "ok",
+        "version": "2.0.0",
+        "message": "Backend is running and accepting requests"
+    }
 
 
 # ===================================================================
@@ -254,13 +267,17 @@ async def api_admin_test_download(request: Request):
 
 @app.post("/api/admin/save")
 async def api_admin_save(request: Request):
-    """Approve: save uploaded Excel + config to raters/<slug>/."""
+    """Approve: save uploaded Excel + config to raters/<slug>/ or templates/<slug>/."""
     payload = await request.json()
     upload_id = payload.get("upload_id")
     config = payload.get("config")
     slug = payload.get("slug", "").strip()
     name = payload.get("name", "").strip()
     description = payload.get("description", "").strip()
+    source = payload.get("source", "raters").strip()
+
+    if source not in {"raters", "templates"}:
+        raise HTTPException(status_code=400, detail="source must be 'raters' or 'templates'")
 
     if not upload_id or not config or not slug:
         raise HTTPException(status_code=400, detail="upload_id, config, and slug are required")
@@ -269,10 +286,11 @@ async def api_admin_save(request: Request):
     if not upload_path.exists():
         raise HTTPException(status_code=404, detail="Upload not found — please re-upload the file")
 
-    # Create rater directory
-    rater_dir = RATERS_DIR / slug
+    # Create destination directory
+    base_dir = RATERS_DIR if source == "raters" else TEMPLATES_DIR
+    rater_dir = base_dir / slug
     if rater_dir.exists():
-        raise HTTPException(status_code=409, detail=f"Rater '{slug}' already exists")
+        raise HTTPException(status_code=409, detail=f"Rater '{slug}' already exists in {source}")
 
     rater_dir.mkdir(parents=True, exist_ok=True)
 
@@ -306,7 +324,12 @@ async def api_admin_save(request: Request):
             shutil.rmtree(rater_dir, ignore_errors=True)
         raise HTTPException(status_code=500, detail=f"Failed to save rater: {e}")
 
-    return {"status": "success", "slug": slug, "message": f"Rater '{name or slug}' saved to raters/{slug}/"}
+    return {
+        "status": "success",
+        "slug": slug,
+        "source": source,
+        "message": f"Rater '{name or slug}' saved to {source}/{slug}/",
+    }
 
 
 # ===================================================================
@@ -322,6 +345,3 @@ def health():
     }
 
 
-# Static files MUST be mounted last (catch-all for /ui/*)
-frontend_dir = Path(__file__).parent.parent / "frontend"
-app.mount("/ui", StaticFiles(directory=str(frontend_dir), html=True), name="frontend")

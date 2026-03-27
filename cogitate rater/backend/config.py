@@ -4,13 +4,19 @@
 import platform
 from pathlib import Path
 
-# ─── Root directory ───────────────────────────────────────────────────
-ROOT_DIR = Path(__file__).parent.parent
+# ─── App/data root directory ──────────────────────────────────────────
+APPS_DIR = Path(__file__).resolve().parent.parent
+if not APPS_DIR.exists():
+    APPS_DIR = Path(__file__).resolve().parent.parent.parent
+
+# Backward compatibility: if data folders are still at repo root, keep working.
+if not (APPS_DIR / "raters").exists() and (APPS_DIR.parent / "raters").exists():
+    APPS_DIR = APPS_DIR.parent
 
 # ─── Rater / template / upload directories ────────────────────────────
-RATERS_DIR = ROOT_DIR / "raters"
-TEMPLATES_DIR = ROOT_DIR / "templates"
-UPLOADS_DIR = ROOT_DIR / "dump" / "uploads"
+RATERS_DIR = APPS_DIR / "raters"
+TEMPLATES_DIR = APPS_DIR / "templates"
+UPLOADS_DIR = APPS_DIR / "dump" / "uploads"
 
 RATERS_DIR.mkdir(exist_ok=True)
 TEMPLATES_DIR.mkdir(exist_ok=True)
