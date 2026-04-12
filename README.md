@@ -1,93 +1,139 @@
-# Cogitate Rater Engine
+# 🚀 Cogitate Rater Engine
 
 A blazing fast, next-generation hybrid pricing engine that dynamically converts locally-built pricing/rating Microsoft Excel files into live, highly-concurrent web applications instantly.
 
-## ?? Overview
-The Cogitate Rater Engine leverages a powerful **FastAPI + Microsoft Excel native COM (win32com) backend** combined with a **Next.js (React) + TailwindCSS frontend**.
+## 📊 Architecture & Data Flow
 
-Unlike traditional tools that either require manual hardcoding of Excel logic into web languages, or use slow library-based parsers, this platform:
-1. reads a standardized _Schema tab from your uploaded Excel sheet to dynamically construct the frontend inputs/outputs form.
-2. Maintains a "Warm" Background Pool (TemplateWorkerPool) of native invisible Microsoft Excel COM processes in system RAM.
-3. Automatically maps incoming JSON payload data into the Excel file, strictly computes via Excel's native engine, and pulls the evaluated results outward all with virtually zero latency.
+`mermaid
+graph TD
+    subgraph Frontend
+        A[Next.js Web UI]
+    end
+    subgraph FastAPI Backend
+        B[API Router / main.py]
+        C[Engine & Schema Parser]
+        D[Warm Sessions Pool]
+    end
+    subgraph Local System
+        E[(Microsoft Excel win32com)]
+        F[Immutable /records/ DB]
+    end
 
-## ? Features
-- **Admin Engine Workspace:** Upload raw .xlsx files, view the parsed inputs/outputs rendered via JSON mapping, test calculation values, and officially approve/save it to the rater repository.
-- **Client Execution Panel:** Allows end-users (or integration systems) to choose a locked system template or an admin-approved custom rater to instantly compute premiums.
-- **Historical Immutable Records:** Every test, execution, and calculation is permanently fingerprinted and stored in a local /records immutable database for audit tracking.
-- **High Concurrency:** Background processes hold calculation files open in RAM (preventing disk I/O bottlenecks or slow boot-up times).
+    A -->|1. Uploads Excel Schema| B
+    B -->|2. Parses _Schema Tab| C
+    C -->|3. Returns JSON UI Form| A
+    
+    A -->|4. Triggers Calculation| B
+    B -->|5. Grabs Warm Instance| D
+    D -->|6. Injects JSON Data| E
+    E -->|7. Calculates Rates| E
+    E -->|8. Returns Output| B
+    B -->|9. Saves Audit Snapshot| F
+    B -->|10. Returns Premium| A
+`
 
----
+## ⚙️ Core Workflows Explained
 
-## ??? Architecture
+### 1. The Admin Workflow (Dynamic UI Generation)
+Raw Excel logic is converted into a web app here.
+- **Upload:** An admin uploads a standard .xlsx pricing file containing a _Schema tab.
+- **Parsing:** FastAPI reads the _Schema tab to map input variables, data types, and output cells.
+- **Dynamic UI:** The schema is sent to Next.js as JSON, which instantly generates a dynamic HTML form (dropdowns, inputs). **Zero hardcoding required.**
+- **Saving:** The admin tests and saves the rater, officially registering it in the 
+aters/ directory for clients.
+
+### 2. The Pre-Warming Workflow (RAM Management)
+This creates the "blazing fast" zero-latency experience.
+- **Background Trigger:** When a client selects a template, the frontend silently pings the backend /config endpoint.
+- **COM Threads:** FastAPI uses a BackgroundTask to instruct warm_sessions.py to open Microsoft Excel invisibly via Windows COM (win32com) and load the .xlsx into system RAM.
+- **Standby:** The file is held open, avoiding slow disk I/O when it's time to actually calculate.
+
+### 3. The Client Execution Workflow (Calculation & Audit)
+How the end-user gets their premium.
+- **Execution:** User fills out the web form. A JSON payload is sent to the backend.
+- **Injection:** excel_worker.py grabs the pre-warmed Excel instance from RAM, injects the JSON values directly into the target cells, and tells Excel to calculate.
+- **Audit Log:** *Before* returning the data, _save_execution_record() creates a permanent fingerprint of the exact inputs, outputs, and Excel file used, saving it to /records/.
+- **Response:** The calculated premium is returned to the user in milliseconds.
+
+## 📁 Folder Structure
 
 `	ext
-/cogitate rater
-+-- /backend/               # Python (FastAPI) Backend
-�   +-- main.py             # Core API routing, execution & save logging hooks
-�   +-- engine.py           # Bridging logic between web payloads and Excel
-�   +-- warm_sessions.py    # Manages backend concurrent Excel.Application Thread Pools
-�   +-- excel_worker.py     # COM automation logic manipulating specific cells
-�   +-- requirements.txt    # Python Dependencies
-�
-+-- /web-next/              # React (Next.js) Frontend
-�   +-- src/app/admin/      # Admin creation and testing workflows
-�   +-- src/app/client/     # Standard user interaction and calculation execution
-�   +-- src/components/     # Dynamic form renderers and Output Panels
-�
-+-- /templates/             # Locked, official base pricing templates
-+-- /raters/                # Saved, approved custom raters spawned from the Admin panel
-+-- /records/               # Immutable database mapping histories of executions
-+-- start-all.bat           # Deployment script
+cogitate-rater-engine/
+├── cogitate rater/
+│   ├── backend/               # FastAPI & win32com engine
+│   │   ├── engine.py          # Bridging logic mapping web payloads to Excel
+│   │   ├── excel_worker.py    # Native COM automation interacting with cells
+│   │   ├── main.py            # API routes and database hooks
+│   │   ├── warm_sessions.py   # Session & RAM thread pool management
+│   │   └── requirements.txt   # Python Dependencies
+│   ├── raters/                # Saved, approved custom raters spawned from Admin
+│   ├── templates/             # Locked, official base pricing templates
+│   └── web-next/              # React (Next.js) Frontend
+│       ├── src/app/admin/     # Admin upload and testing workflows
+│       ├── src/app/client/    # Client execution & calculation panel
+│       └── src/components/    # Dynamic React form renderers
+└── README.md                  # This documentation
 `
 
----
+## 🛑 Prerequisites
 
-## ?? Pre-requisites
+Because this app daemonizes native Microsoft technologies via COM APIs, **the backend MUST be run on a Windows machine with Microsoft Excel installed locally.**
 
-Because this application daemonizes native Microsoft technologies via COM APIs, **the backend must be run on a Windows machine with Microsoft Excel installed locally**.
+*   **OS:** Windows 10/11 or Windows Server.
+*   **Software:** Microsoft Office/Excel installed locally.
+*   **Backend:** Python 3.9+
+*   **Frontend:** Node.js v18+
 
-*   **Operating System**: Windows 10/11 or Windows Server.
-*   **Microsoft Excel**: A locally licensed version of Microsoft Office/Excel must be installed.
-*   **Python Target**: Python 3.9 ~ 3.11.
-*   **Node.js**: Node v18+ (for Next.js frontend).
+## 🛠️ Step-by-Step Installation
 
----
+### 1. Clone the Repository
+`ash
+git clone https://github.com/tanmay5110/cogitate-code-review.git
+cd cogitate-code-review
+`
 
-## ??? Installation & Setup
-
-### 1. Dependency Setup (Python & Node)
-
-If you are setting this up for the first time, you must install the dependencies for both environments.
-
-**Backend (Python)**:
+### 2. Setup the Backend (Python)
 `powershell
-pip install -r requirements.txt
-`
+cd "cogitate rater/backend"
 
-**Frontend (Node/Next.js)**:
+# Create and activate a virtual environment
+python -m venv .venv
+.\.venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Start the FastAPI Server
+uvicorn main:app --reload
+`
+*The backend is now running on http://127.0.0.1:8000*
+
+### 3. Setup the Frontend (Next.js)
+Open a **new** terminal window:
 `powershell
 cd "cogitate rater/web-next"
+
+# Install Node dependencies
 npm install
-npm run build
+
+# Start the Next.js development server
+npm run dev
 `
+*The frontend is now running on http://localhost:3000*
 
-### 2. Running The Application
+## 🔌 API Payload Example (Integration)
 
-You can start both servers concurrently using the provided batch file in the root directory:
-`powershell
-./start-all.bat
+If you are hitting the API programmatically (without the frontend UI), your JSON payload will look like this:
+
+`json
+POST /api/rater/calculate
+{
+    "rater_id": "homeowners_v1",
+    "inputs": {
+        "Coverage_A": 500000,
+        "Deductible": 1000,
+        "Construction_Type": "Frame",
+        "Year_Built": 2020
+    }
+}
 `
-
-Alternatively, run them manually in separate terminal windows:
-*   **Backend Server:** cd "cogitate rater/backend" -> uvicorn main:app --reload (Runs on http://127.0.0.1:8000)
-*   **Frontend Server:** cd "cogitate rater/web-next" -> 
-pm run dev (Runs on http://localhost:3000)
-
-## ?? Usage Workflow
-
-1. Navigate to **http://localhost:3000** in your browser.
-2. **Launch the Admin UI**: Upload your local Excel rater file (Must contain a tab named _Schema formatted correctly).
-3. The platform will automatically parse the schema and dynamically construct a test-rig web UI.
-4. Input test parameters into the generated form and click **Test Calculate**.
-5. Once vetted, assign it a Name and click **Save Rater**.
-6. Switch over to the **Client UI**. Choose your newly saved Rater (or a System Template) from the dropdown. Notice how the calculation occurs almost instantly due to the pre-warming RAM features actively handling your request in the background!
