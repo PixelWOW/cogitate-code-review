@@ -52,6 +52,9 @@ def _get_base_dir(source):
         return RATERS_DIR
     elif source == "templates":
         return TEMPLATES_DIR
+    elif source == "records":
+        from config import RECORDS_DIR
+        return RECORDS_DIR
     else:
         raise ValueError(f"Unknown source: {source}")
 

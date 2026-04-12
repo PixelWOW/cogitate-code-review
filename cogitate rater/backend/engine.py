@@ -1,18 +1,12 @@
 # backend/engine.py
-# Generic calculation engine — works with any Excel + config.json
+# Native Microsoft Excel COM calculation engine
 
-import uuid
-import shutil
-import subprocess
 import tempfile
+import time
 from pathlib import Path
+from typing import Any
 
-import openpyxl
-
-from config import LIBREOFFICE_BIN
-
-
-def _get_session_dirs():
+def _get_session_dirs() -> tuple[Path, Path]:
     base = Path(tempfile.gettempdir()) / "rater_sessions"
     input_dir = base / "input"
     output_dir = base / "output"
@@ -20,16 +14,13 @@ def _get_session_dirs():
     output_dir.mkdir(parents=True, exist_ok=True)
     return input_dir, output_dir
 
-
-def _coerce_by_type(value, value_type):
+def _coerce_by_type(value: Any, value_type: str) -> Any:
     if value is None:
         return None
     if value_type != "number":
         return value
-
     if isinstance(value, (int, float)):
         return value
-
     text = str(value).strip()
     if text == "":
         return None
@@ -38,32 +29,20 @@ def _coerce_by_type(value, value_type):
     except ValueError:
         return value
 
-
-def _write_schedule_inputs(ws, config, input_data):
-    """
-    Write dynamic schedule rows when config contains schedule metadata.
-
-    Returns a set of cell references that were controlled by schedule logic,
-    so flat writers can skip those cells and avoid conflicting writes.
-    """
+def _write_schedule_inputs(ws, config: dict[str, Any], input_data: dict[str, Any]) -> set[str]:
     schedule_defs = config.get("schedules") or []
     if not schedule_defs:
         return set()
-
     schedule_payload = input_data.get("schedules") or input_data.get("_schedules")
     if not isinstance(schedule_payload, dict):
         return set()
-
     write_rules = config.get("writeRules") or {}
     clear_unused = bool(write_rules.get("clearUnusedRows", True))
-
-    controlled_cells = set()
-
+    controlled_cells: set[str] = set()
     for sched in schedule_defs:
         key = sched.get("key")
         if not key:
             continue
-
         row_start = sched.get("rowStart")
         row_end = sched.get("rowEnd")
         columns = sched.get("columns") or []
@@ -71,148 +50,105 @@ def _write_schedule_inputs(ws, config, input_data):
             continue
         if row_end < row_start:
             continue
-
         rows_data = schedule_payload.get(key) or []
         if not isinstance(rows_data, list):
             rows_data = []
-
         for idx, row_num in enumerate(range(row_start, row_end + 1)):
             row_data = rows_data[idx] if idx < len(rows_data) and isinstance(rows_data[idx], dict) else {}
             row_active = any(v not in (None, "") for v in row_data.values())
-
             for col_def in columns:
                 col = col_def.get("column")
                 field = col_def.get("field")
                 value_type = col_def.get("type")
                 if not col or not field:
                     continue
-
                 cell_ref = f"{col}{row_num}"
                 controlled_cells.add(cell_ref)
-
                 if row_active and field in row_data:
                     ws[cell_ref] = _coerce_by_type(row_data.get(field), value_type)
                 elif clear_unused:
                     ws[cell_ref] = None
-
     return controlled_cells
 
+def _build_prime_inputs(config: dict[str, Any]) -> dict[str, Any]:
+    payload: dict[str, Any] = {}
+    for item in config.get("inputs") or []:
+        field = item.get("field")
+        if not field:
+            continue
+        if "default" in item:
+            payload[field] = item.get("default")
+    return payload
 
-def _write_cell(wb, default_sheet_name, cell_ref, value):
-    if "!" in cell_ref:
-        sheet_part, coord = cell_ref.split("!", 1)
-        sheet_part = sheet_part.strip("'\"")
-        wb[sheet_part][coord] = value
-    else:
-        wb[default_sheet_name][cell_ref] = value
-
-def _read_cell(wb, default_sheet_name, cell_ref):
-    if "!" in cell_ref:
-        sheet_part, coord = cell_ref.split("!", 1)
-        sheet_part = sheet_part.strip("'\"")
-        return wb[sheet_part][coord].value
-    return wb[default_sheet_name][cell_ref].value
-
-def calculate(template_path: Path, config: dict, input_data: dict, keep_file: bool = False) -> dict:
+def calculate(template_path: Path, config: dict[str, Any], input_data: dict[str, Any], keep_file: bool = False) -> dict:
     """
-    Generic calculation cycle.
-
-    Args:
-        template_path: path to the master .xlsx template (never modified)
-        config: dict with "sheet", "inputs", "outputs" keys
-        input_data: dict of { field_name: value } from the user form
-        keep_file: if True, keep the output .xlsx and return its path
-
-    Returns:
-        dict of output values keyed by field name
+    Generic calculation cycle via ExcelWorker (win32com).
     """
-    session_id = str(uuid.uuid4())
-    input_dir, output_dir = _get_session_dirs()
-    session_file = input_dir / f"{session_id}.xlsx"
-    output_file = output_dir / f"{session_id}.xlsx"
+    import warm_sessions
+    worker = warm_sessions.get_template_worker(template_path, config)
+    if not worker or not worker.is_ready or worker.error:
+        raise RuntimeError(f"Excel COM worker unavailable. Error: {worker.error if worker else 'Worker None'}")
+    
+    outputs, _ = worker.calculate_sync(input_data, keep_file=keep_file)
+    return outputs
 
-    # Build lookup: field_name -> cell reference
-    input_map = {inp["field"]: inp["cell"] for inp in config["inputs"]}
-    input_type_map = {inp["field"]: inp.get("type", "text") for inp in config["inputs"]}
-    output_map = {out["field"]: out["cell"] for out in config["outputs"]}
-    sheet_name = config["sheet"]
+def calculate_with_metrics(
+    template_path: Path,
+    config: dict[str, Any],
+    input_data: dict[str, Any],
+    keep_file: bool = False,
+) -> tuple[dict[str, Any], dict[str, float]]:
+    import warm_sessions
+    worker = warm_sessions.get_template_worker(template_path, config)
+    if not worker or not worker.is_ready or worker.error:
+        raise RuntimeError(f"Excel COM worker unavailable.")
+    
+    return worker.calculate_sync(input_data, keep_file=keep_file)
 
-    try:
-        # Step 1: Copy template
-        shutil.copy(template_path, session_file)
+def prime_upload_session(upload_id: str, upload_path: Path, config: dict[str, Any]) -> dict[str, Any]:
+    import warm_sessions
+    from excel_worker import ExcelWorker
+    
+    worker = ExcelWorker(upload_id, upload_path, config)
+    worker.start()
+    
+    start_wait = time.time()
+    while not worker.is_ready and worker.error is None:
+        if time.time() - start_wait > 30:
+            worker.shutdown()
+            raise RuntimeError("Excel worker start timeout")
+        time.sleep(0.1)
+        
+    if worker.error:
+        worker.shutdown()
+        raise RuntimeError(f"Failed to start Excel worker: {worker.error}")
+        
+    warm_sessions.set_worker(upload_id, worker)
+    prime_inputs = _build_prime_inputs(config)
+    _, timings = worker.calculate_sync(prime_inputs, keep_file=False)
+    
+    return {
+        "upload_id": upload_id,
+        "timings": timings,
+    }
 
-        # Step 2: Write inputs
-        wb = openpyxl.load_workbook(session_file)
-        ws = wb[sheet_name]
-
-        # Optional schedule-mode write path (backward-compatible).
-        # If no schedule payload/definitions exist, this is a no-op.
-        schedule_cells = _write_schedule_inputs(ws, config, input_data)
-
-        for field, value in input_data.items():
-            if field in {"schedules", "_schedules"}:
-                continue
-            cell_ref = input_map.get(field)
-            if cell_ref and cell_ref not in schedule_cells:
-                val_type = input_type_map.get(field, "text")
-                _write_cell(wb, sheet_name, cell_ref, _coerce_by_type(value, val_type))
-
-        wb.save(session_file)
-        wb.close()
-
-        # Step 3: LibreOffice recalculation
-        result = subprocess.run(
-            [
-                LIBREOFFICE_BIN,
-                "--headless",
-                "--calc",
-                "--convert-to", "xlsx",
-                "--outdir", str(output_dir),
-                str(session_file),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"LibreOffice failed (exit={result.returncode}): "
-                f"stderr={result.stderr.strip()}"
-            )
-
-        if not output_file.exists():
-            raise RuntimeError(
-                f"LibreOffice did not produce output file. "
-                f"stdout={result.stdout.strip()}"
-            )
-
-        # Step 4: Read outputs
-        wb_out = openpyxl.load_workbook(output_file, data_only=True)
-
-        outputs = {}
-        for field, cell_ref in output_map.items():
-            val = _read_cell(wb_out, sheet_name, cell_ref)
-            if isinstance(val, float):
-                val = round(val, 4)
-            outputs[field] = val
-
-        wb_out.close()
-
-        if keep_file:
-            outputs["_output_file"] = str(output_file)
-
-        return outputs
-
-    finally:
-        # Step 5: Cleanup
-        if session_file.exists():
-            try:
-                session_file.unlink()
-            except OSError:
-                pass
-        if not keep_file and output_file.exists():
-            try:
-                output_file.unlink()
-            except OSError:
-                pass
+def calculate_for_upload_session(
+    upload_id: str,
+    upload_path: Path,
+    config: dict[str, Any],
+    input_data: dict[str, Any],
+    keep_file: bool = False,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    import warm_sessions
+    
+    worker = warm_sessions.get_worker(upload_id)
+    if worker and worker.is_ready and not worker.error:
+        warm_sessions.mark_used(upload_id)
+        outputs, timings = worker.calculate_sync(input_data, keep_file=keep_file)
+        return outputs, {
+            "warm_state": "active",
+            "warm_used": True,
+            "timings": timings,
+        }
+        
+    raise RuntimeError(f"Missing active Excel worker for upload_id: {upload_id}")
