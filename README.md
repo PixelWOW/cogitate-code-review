@@ -49,10 +49,10 @@ Each workbook must include a sheet named `_Schema`. The parser expects columns A
 |---|---|---|---|
 | A | `field` | Yes | Unique field key used in payload/config |
 | B | `cell` | Yes | Excel cell reference (example: `D12`) |
-| C | `type` | No | Field type (`text`, `number`, etc.) |
-| D | `label` | No | Display label used in UI |
-| E | `direction` | No | `input` or `output` |
-| F | `group` | No | UI grouping label |
+| C | `type` | Yes | Field type (`text`, `number`, etc.) |
+| D | `label` | Yes | Display label used in UI |
+| E | `direction` | Yes | `input` or `output` |
+| F | `group` | no | UI grouping label |
 | G | `options` | No | Semicolon-separated values; creates dropdown |
 | H | `default` | No | Default value for the field |
 
