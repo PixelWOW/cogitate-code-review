@@ -1,139 +1,107 @@
-# 🚀 Cogitate Rater Engine
+﻿# 🚀 Cogitate Rater Engine
 
-A blazing fast, next-generation hybrid pricing engine that dynamically converts locally-built pricing/rating Microsoft Excel files into live, highly-concurrent web applications instantly.
+## 📖 What is this Project & What Problem Does it Solve?
+In the insurance and financial industries, complex pricing models are traditionally built and maintained in massive Microsoft Excel workbooks. Converting these Excel files into modern web applications typically takes months of manual software development, or relies on slow, error-prone third-party spreadsheet parsing libraries.
 
-## 📊 Architecture & Data Flow
+**The Cogitate Rater Engine** solves this by acting as a high-speed, dynamic hybrid bridge. It takes a local Excel file, reads a configuration tab, and **instantly generates a fully functional React web application**. Under the hood, it keeps native Microsoft Excel running invisibly in the server's background RAM, injecting web payloads and extracting calculated results in milliseconds.
 
-`mermaid
-graph TD
-    subgraph Frontend
-        A[Next.js Web UI]
-    end
-    subgraph FastAPI Backend
-        B[API Router / main.py]
-        C[Engine & Schema Parser]
-        D[Warm Sessions Pool]
-    end
-    subgraph Local System
-        E[(Microsoft Excel win32com)]
-        F[Immutable /records/ DB]
-    end
+### The Two Core Panels
+1. **Admin Panel (The Builder):** 
+   Designed for system administrators. You upload your standard .xlsx pricing file. The system automatically parses your required inputs and outputs, generating a dynamic test UI right in your browser. You can test your premiums and, once verified, officially save the "Rater" to the repository.
+   
+2. **Client Panel (The Execution):**
+   Designed for end-users. The client selects an approved Rater (or system template) from a dropdown. Thanks to our **RAM Pre-warming** technology, the backend quietly boots up the specific Excel COM instance in advance. When the user submits the form, the calculation executes instantly with zero disk I/O latency. Every single transaction is permanently captured and saved in an immutable /records folder for compliance and historical auditing.
 
-    A -->|1. Uploads Excel Schema| B
-    B -->|2. Parses _Schema Tab| C
-    C -->|3. Returns JSON UI Form| A
-    
-    A -->|4. Triggers Calculation| B
-    B -->|5. Grabs Warm Instance| D
-    D -->|6. Injects JSON Data| E
-    E -->|7. Calculates Rates| E
-    E -->|8. Returns Output| B
-    B -->|9. Saves Audit Snapshot| F
-    B -->|10. Returns Premium| A
-`
+---
 
-## ⚙️ Core Workflows Explained
+## 📊 The Excel _Schema Sheet
+For the engine to know how to interact with your Excel file and build the frontend website, your .xlsx workbook **must** contain a worksheet named exactly _Schema. 
 
-### 1. The Admin Workflow (Dynamic UI Generation)
-Raw Excel logic is converted into a web app here.
-- **Upload:** An admin uploads a standard .xlsx pricing file containing a _Schema tab.
-- **Parsing:** FastAPI reads the _Schema tab to map input variables, data types, and output cells.
-- **Dynamic UI:** The schema is sent to Next.js as JSON, which instantly generates a dynamic HTML form (dropdowns, inputs). **Zero hardcoding required.**
-- **Saving:** The admin tests and saves the rater, officially registering it in the 
-aters/ directory for clients.
+This sheet acts as the "API Contract" between the local Excel formulas and the Web UI. It defines:
+* **Variable Name:** The human-readable label that will appear on the website's form.
+* **Cell Reference:** The exact cell (e.g., Sheet1!B2) where the user's input should be injected or the output premium extracted.
+* **Component / Data Type:** Whether it is an Input (Dropdown, Number field, Text) or an Output (Premium calculation).
 
-### 2. The Pre-Warming Workflow (RAM Management)
-This creates the "blazing fast" zero-latency experience.
-- **Background Trigger:** When a client selects a template, the frontend silently pings the backend /config endpoint.
-- **COM Threads:** FastAPI uses a BackgroundTask to instruct warm_sessions.py to open Microsoft Excel invisibly via Windows COM (win32com) and load the .xlsx into system RAM.
-- **Standby:** The file is held open, avoiding slow disk I/O when it's time to actually calculate.
+When the Admin uploads the Excel file, our FastAPI backend reads this _Schema tab, turns it into a JSON configuration, and the Next.js frontend uses that JSON to draw the input form dynamically—requiring absolutely zero frontend code changes when Excel logic updates.
 
-### 3. The Client Execution Workflow (Calculation & Audit)
-How the end-user gets their premium.
-- **Execution:** User fills out the web form. A JSON payload is sent to the backend.
-- **Injection:** excel_worker.py grabs the pre-warmed Excel instance from RAM, injects the JSON values directly into the target cells, and tells Excel to calculate.
-- **Audit Log:** *Before* returning the data, _save_execution_record() creates a permanent fingerprint of the exact inputs, outputs, and Excel file used, saving it to /records/.
-- **Response:** The calculated premium is returned to the user in milliseconds.
+---
 
-## 📁 Folder Structure
+## 📁 Codebase Folder Structure
 
 `	ext
-cogitate-rater-engine/
+cogitate-code-review/
 ├── cogitate rater/
-│   ├── backend/               # FastAPI & win32com engine
-│   │   ├── engine.py          # Bridging logic mapping web payloads to Excel
-│   │   ├── excel_worker.py    # Native COM automation interacting with cells
-│   │   ├── main.py            # API routes and database hooks
-│   │   ├── warm_sessions.py   # Session & RAM thread pool management
-│   │   └── requirements.txt   # Python Dependencies
-│   ├── raters/                # Saved, approved custom raters spawned from Admin
-│   ├── templates/             # Locked, official base pricing templates
-│   └── web-next/              # React (Next.js) Frontend
-│       ├── src/app/admin/     # Admin upload and testing workflows
-│       ├── src/app/client/    # Client execution & calculation panel
-│       └── src/components/    # Dynamic React form renderers
-└── README.md                  # This documentation
+│   ├── backend/               # Python FastAPI & MS Excel COM Engine
+│   │   ├── engine.py          # Bridging logic: Maps web JSON payload into Excel cells
+│   │   ├── excel_worker.py    # Native Windows 'win32com' automation logic
+│   │   ├── main.py            # API routing, Background Tasks, and Execution Logging
+│   │   ├── warm_sessions.py   # RAM Management: Keeps Excel instances idling for speed
+│   │   └── requirements.txt   # Python dependencies
+│   │
+│   ├── web-next/              # React (Next.js) Frontend
+│   │   ├── src/app/admin/     # Admin Excel upload and dynamic testing UI
+│   │   ├── src/app/client/    # End-user execution panel
+│   │   └── src/components/    # Reusable dynamic form renderers
+│   │
+│   ├── raters/                # Saved, approved custom raters from the Admin panel
+│   ├── templates/             # Locked, official base pricing fallback templates
+│   └── records/               # Immutable database mapping histories of executions
+└── README.md                  # This documentation file
 `
 
-## 🛑 Prerequisites
+---
 
-Because this app daemonizes native Microsoft technologies via COM APIs, **the backend MUST be run on a Windows machine with Microsoft Excel installed locally.**
+## 🛠️ Detailed Setup & Execution Instructions
 
-*   **OS:** Windows 10/11 or Windows Server.
-*   **Software:** Microsoft Office/Excel installed locally.
-*   **Backend:** Python 3.9+
-*   **Frontend:** Node.js v18+
+Because this system daemonizes native Microsoft Windows technologies to achieve lightning speed, **the backend must be run on a Windows machine with Microsoft Excel installed locally.**
 
-## 🛠️ Step-by-Step Installation
+### Prerequisites
+* **Operating System:** Windows 10, 11, or Windows Server.
+* **Microsoft Excel:** A locally installed, licensed version of MS Office/Excel.
+* **Python:** Version 3.9 to 3.11.
+* **Node.js:** Version 18 or higher (for the Next.js frontend).
 
-### 1. Clone the Repository
-`ash
+---
+
+### Step 1: Clone the Repository
+Open your terminal and clone the repository locally.
+`powershell
 git clone https://github.com/tanmay5110/cogitate-code-review.git
 cd cogitate-code-review
 `
 
-### 2. Setup the Backend (Python)
+### Step 2: Start the FastAPI Backend (Python)
+Navigate to the backend directory, set up your Python virtual environment, install the dependencies, and start the engine:
+
 `powershell
 cd "cogitate rater/backend"
 
-# Create and activate a virtual environment
+# Create a virtual environment
 python -m venv .venv
+
+# Activate the virtual environment
 .\.venv\Scripts\activate
 
-# Install dependencies
+# Install the required packages
 pip install -r requirements.txt
 
-# Start the FastAPI Server
+# Boot up the server
 uvicorn main:app --reload
 `
-*The backend is now running on http://127.0.0.1:8000*
+*The backend API is now actively running on http://127.0.0.1:8000*
 
-### 3. Setup the Frontend (Next.js)
-Open a **new** terminal window:
+### Step 3: Start the Next.js Frontend (React)
+Open a **new, separate terminal** window. Navigate to the frontend directory, install the Node modules, and start the web interface:
+
 `powershell
 cd "cogitate rater/web-next"
 
-# Install Node dependencies
+# Install Node modules
 npm install
 
-# Start the Next.js development server
+# Start the development frontend server
 npm run dev
 `
-*The frontend is now running on http://localhost:3000*
+*The frontend interface is now running on http://localhost:3000* 
 
-## 🔌 API Payload Example (Integration)
-
-If you are hitting the API programmatically (without the frontend UI), your JSON payload will look like this:
-
-`json
-POST /api/rater/calculate
-{
-    "rater_id": "homeowners_v1",
-    "inputs": {
-        "Coverage_A": 500000,
-        "Deductible": 1000,
-        "Construction_Type": "Frame",
-        "Year_Built": 2020
-    }
-}
-`
+> **🎉 You're Done!** Navigate your web browser to http://localhost:3000/admin, upload an Excel file equipped with a _Schema tab, and watch the engine dynamically construct your application.
