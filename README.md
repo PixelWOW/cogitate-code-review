@@ -1,107 +1,145 @@
-﻿# 🚀 Cogitate Rater Engine
+# Cogitate Rater Engine
 
-## 📖 What is this Project & What Problem Does it Solve?
-In the insurance and financial industries, complex pricing models are traditionally built and maintained in massive Microsoft Excel workbooks. Converting these Excel files into modern web applications typically takes months of manual software development, or relies on slow, error-prone third-party spreadsheet parsing libraries.
+## Project Overview
+This project converts Excel-based pricing models into a web application without rewriting formulas into another language. It uses a FastAPI backend and native Microsoft Excel COM automation (`win32com`) to calculate outputs using the original workbook logic.
 
-**The Cogitate Rater Engine** solves this by acting as a high-speed, dynamic hybrid bridge. It takes a local Excel file, reads a configuration tab, and **instantly generates a fully functional React web application**. Under the hood, it keeps native Microsoft Excel running invisibly in the server's background RAM, injecting web payloads and extracting calculated results in milliseconds.
+The goal is to let teams keep Excel as the source of truth while providing a fast, auditable web experience for both administrators and business users.
 
-### The Two Core Panels
-1. **Admin Panel (The Builder):** 
-   Designed for system administrators. You upload your standard .xlsx pricing file. The system automatically parses your required inputs and outputs, generating a dynamic test UI right in your browser. You can test your premiums and, once verified, officially save the "Rater" to the repository.
-   
-2. **Client Panel (The Execution):**
-   Designed for end-users. The client selects an approved Rater (or system template) from a dropdown. Thanks to our **RAM Pre-warming** technology, the backend quietly boots up the specific Excel COM instance in advance. When the user submits the form, the calculation executes instantly with zero disk I/O latency. Every single transaction is permanently captured and saved in an immutable /records folder for compliance and historical auditing.
+## What Problem This Solves
+- Removes manual reimplementation of Excel formulas in backend code.
+- Reduces time to expose new pricing models to users.
+- Preserves native Excel behavior by calculating in Excel itself.
+- Supports auditability by saving immutable execution records.
 
----
+## Admin Panel and Client Panel
 
-## 📊 The Excel _Schema Sheet
-For the engine to know how to interact with your Excel file and build the frontend website, your .xlsx workbook **must** contain a worksheet named exactly _Schema. 
+### Admin Panel
+The Admin panel is used by product or operations teams to onboard and validate rating models:
+1. Upload an `.xlsx` workbook.
+2. Parse the `_Schema` sheet into a dynamic configuration.
+3. Run test calculations.
+4. Save the model into `raters/` or `templates/`.
 
-This sheet acts as the "API Contract" between the local Excel formulas and the Web UI. It defines:
-* **Variable Name:** The human-readable label that will appear on the website's form.
-* **Cell Reference:** The exact cell (e.g., Sheet1!B2) where the user's input should be injected or the output premium extracted.
-* **Component / Data Type:** Whether it is an Input (Dropdown, Number field, Text) or an Output (Premium calculation).
+### Client Panel
+The Client panel is used to execute approved raters:
+1. Select a saved rater or template.
+2. Load the generated input form.
+3. Submit inputs and get outputs.
+4. Persist execution metadata into `records/`.
 
-When the Admin uploads the Excel file, our FastAPI backend reads this _Schema tab, turns it into a JSON configuration, and the Next.js frontend uses that JSON to draw the input form dynamically—requiring absolutely zero frontend code changes when Excel logic updates.
+## End-to-End Flow
+```mermaid
+flowchart LR
+A[Admin uploads workbook] --> B[Backend parses _Schema sheet]
+B --> C[Admin UI generated from config]
+C --> D[Test calculate]
+D --> E[Save to raters/templates]
+E --> F[Client selects rater/template]
+F --> G[Warm Excel worker in RAM]
+G --> H[Client submit inputs]
+H --> I[Excel calculate outputs]
+I --> J[Return outputs]
+I --> K[Save record snapshot]
+```
 
----
+## Excel `_Schema` Sheet Format
+Each workbook must include a sheet named `_Schema`. The parser expects columns A-H:
 
-## 📁 Codebase Folder Structure
+| Column | Name | Required | Description |
+|---|---|---|---|
+| A | `field` | Yes | Unique field key used in payload/config |
+| B | `cell` | Yes | Excel cell reference (example: `D12`) |
+| C | `type` | No | Field type (`text`, `number`, etc.) |
+| D | `label` | No | Display label used in UI |
+| E | `direction` | No | `input` or `output` |
+| F | `group` | No | UI grouping label |
+| G | `options` | No | Semicolon-separated values; creates dropdown |
+| H | `default` | No | Default value for the field |
 
-`	ext
+If `direction` is omitted, the row defaults to `input`. If `options` is present, the input is rendered as a dropdown.
+
+### Example `_Schema` rows
+```csv
+field,cell,type,label,direction,group,options,default
+state,D5,text,State,input,Risk,"CA;TX;NY",CA
+building_limit,E5,number,Building Limit,input,Coverage,,500000
+deductible,E6,number,Deductible,input,Coverage,"500;1000;2500",1000
+premium,H20,number,Premium,output,Results,,
+```
+
+## Repository Structure
+```text
 cogitate-code-review/
-├── cogitate rater/
-│   ├── backend/               # Python FastAPI & MS Excel COM Engine
-│   │   ├── engine.py          # Bridging logic: Maps web JSON payload into Excel cells
-│   │   ├── excel_worker.py    # Native Windows 'win32com' automation logic
-│   │   ├── main.py            # API routing, Background Tasks, and Execution Logging
-│   │   ├── warm_sessions.py   # RAM Management: Keeps Excel instances idling for speed
-│   │   └── requirements.txt   # Python dependencies
-│   │
-│   ├── web-next/              # React (Next.js) Frontend
-│   │   ├── src/app/admin/     # Admin Excel upload and dynamic testing UI
-│   │   ├── src/app/client/    # End-user execution panel
-│   │   └── src/components/    # Reusable dynamic form renderers
-│   │
-│   ├── raters/                # Saved, approved custom raters from the Admin panel
-│   ├── templates/             # Locked, official base pricing fallback templates
-│   └── records/               # Immutable database mapping histories of executions
-└── README.md                  # This documentation file
-`
+├── README.md
+└── cogitate rater/
+    ├── backend/
+    │   ├── main.py            # API routes (admin, raters, templates, records)
+    │   ├── schema_parser.py   # Parses _Schema sheet to config
+    │   ├── engine.py          # Calculation orchestration
+    │   ├── excel_worker.py    # Excel COM worker lifecycle
+    │   ├── warm_sessions.py   # Worker/session warm management
+    │   └── requirements.txt   # Backend dependencies
+    ├── web-next/
+    │   ├── src/app/admin/     # Admin panel pages
+    │   ├── src/app/tester/    # Client/tester panel pages
+    │   └── src/components/    # Shared UI components
+    ├── raters/                # Approved saved raters
+    ├── templates/             # Base templates
+    ├── uploads/               # Temporary uploaded files
+    └── records/               # Immutable calculation snapshots
+```
 
----
-
-## 🛠️ Detailed Setup & Execution Instructions
-
-Because this system daemonizes native Microsoft Windows technologies to achieve lightning speed, **the backend must be run on a Windows machine with Microsoft Excel installed locally.**
+## Run the System (Detailed)
 
 ### Prerequisites
-* **Operating System:** Windows 10, 11, or Windows Server.
-* **Microsoft Excel:** A locally installed, licensed version of MS Office/Excel.
-* **Python:** Version 3.9 to 3.11.
-* **Node.js:** Version 18 or higher (for the Next.js frontend).
+- Windows 10/11 (or Windows Server)
+- Microsoft Excel installed locally
+- Python 3.9 to 3.11
+- Node.js 18+
 
----
-
-### Step 1: Clone the Repository
-Open your terminal and clone the repository locally.
-`powershell
+### 1) Clone the repository
+```powershell
 git clone https://github.com/tanmay5110/cogitate-code-review.git
 cd cogitate-code-review
-`
+```
 
-### Step 2: Start the FastAPI Backend (Python)
-Navigate to the backend directory, set up your Python virtual environment, install the dependencies, and start the engine:
-
-`powershell
+### 2) Start backend (Terminal 1)
+```powershell
 cd "cogitate rater/backend"
 
-# Create a virtual environment
 python -m venv .venv
-
-# Activate the virtual environment
 .\.venv\Scripts\activate
 
-# Install the required packages
 pip install -r requirements.txt
+uvicorn main:app --host 127.0.0.1 --port 8000 --reload
+```
 
-# Boot up the server
-uvicorn main:app --reload
-`
-*The backend API is now actively running on http://127.0.0.1:8000*
+Backend URL: `http://127.0.0.1:8000`
+Swagger docs: `http://127.0.0.1:8000/docs`
 
-### Step 3: Start the Next.js Frontend (React)
-Open a **new, separate terminal** window. Navigate to the frontend directory, install the Node modules, and start the web interface:
-
-`powershell
+### 3) Start frontend (Terminal 2)
+```powershell
 cd "cogitate rater/web-next"
 
-# Install Node modules
 npm install
-
-# Start the development frontend server
 npm run dev
-`
-*The frontend interface is now running on http://localhost:3000* 
+```
 
-> **🎉 You're Done!** Navigate your web browser to http://localhost:3000/admin, upload an Excel file equipped with a _Schema tab, and watch the engine dynamically construct your application.
+Frontend URL: `http://localhost:3000`
+
+### 4) Use the app
+1. Open `http://localhost:3000/admin` and upload an Excel file with `_Schema`.
+2. Test calculate in Admin.
+3. Save as a rater/template.
+4. Open client/tester panel and run real calculations.
+
+## API Quick Reference
+- `GET /api/health` - backend health
+- `POST /api/admin/upload` - upload workbook and parse schema
+- `POST /api/admin/test-calculate` - run test with upload session
+- `POST /api/admin/save` - save uploaded workbook as rater/template
+- `GET /api/raters` - list approved raters
+- `GET /api/templates` - list templates
+- `POST /api/raters/{slug}/calculate` - execute saved rater
+- `POST /api/templates/{name}/calculate` - execute template
+- `GET /api/records` - list execution snapshots
