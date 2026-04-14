@@ -143,3 +143,24 @@ Frontend URL: `http://localhost:3000`
 - `POST /api/raters/{slug}/calculate` - execute saved rater
 - `POST /api/templates/{name}/calculate` - execute template
 - `GET /api/records` - list execution snapshots
+
+## ⚠️ Troubleshooting & Common COM Errors
+Because this engine physically drives the Microsoft Excel desktop application in the background, you may run into environment-specific COM errors (like `0x800A03EC` or `Missing active Excel worker`) when cloning to a brand new machine.
+
+**1. Ghost Excel Processes (Most Common)**
+If the server was stopped abruptly, hidden Excel processes might stay locked in RAM and block new files from opening. 
+* **Fix:** Open Windows **Task Manager**, find any disconnected background `Microsoft Excel` (`EXCEL.EXE`) processes, and **End Task**.
+
+**2. Protected View (Mark of the Web)**
+If you downloaded your `.xlsx` test file from Slack/Email/Internet, Windows marks it as unsafe. Excel will silently refuse to let the background engine open it.
+* **Fix:** Right-click your `.xlsx` file in File Explorer -> **Properties** -> Check **"Unblock"** at the bottom -> Click Apply.
+
+**3. Blocking UI Prompts in Excel**
+If your Excel installation is unactivated, requires a sign-in, or has a "What's New" popup pending, the headless COM worker will freeze and crash.
+* **Fix:** Open Excel normally from your Start Menu. Dismiss any popups, sign-ins, or activation warnings so you have a clean blank workbook. Close Excel.
+
+**4. The SystemProfile Desktop Bug**
+On some Windows OS builds, the COM automation service explicitly requires systemic "Desktop" folders to exist.
+* **Fix:** Create these two empty folders manually via File Explorer:
+  - `C:\Windows\System32\config\systemprofile\Desktop`
+  - `C:\Windows\SysWOW64\config\systemprofile\Desktop`
