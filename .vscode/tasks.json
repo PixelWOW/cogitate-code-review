@@ -1,0 +1,18 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run Cogitate Merged App",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-NoProfile",
+				"-ExecutionPolicy",
+				"Bypass",
+				"-Command",
+				"Start-Process powershell -ArgumentList '-NoExit','-Command','Set-Location \"d:\\Project\\Cogitate Rater AI\\cogitate-merged-app\\backend\"; uvicorn main:app --host 127.0.0.1 --port 8000 --reload'; Set-Location \"d:\\Project\\Cogitate Rater AI\\cogitate-merged-app\\frontend\"; npm run dev"
+			],
+			"isBackground": true
+		}
+	]
+}
