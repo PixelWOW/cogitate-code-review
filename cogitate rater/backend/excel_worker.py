@@ -22,7 +22,11 @@ class ExcelWorker(threading.Thread):
     def __init__(self, upload_id: str, workbook_path: Path, config: Dict[str, Any]):
         super().__init__(name=f"ExcelWorker-{upload_id}")
         self.upload_id = upload_id
-        self.workbook_path = str(workbook_path.resolve())
+        import os
+        path_str = str(workbook_path.resolve())
+        # Force Windows slashes; Workbooks.Open is notoriously strict
+        path_str = os.path.abspath(path_str).replace("/", "\\")
+        self.workbook_path = path_str
         self.config = config
 
         self.request_queue = queue.Queue()
@@ -40,7 +44,13 @@ class ExcelWorker(threading.Thread):
             # -4135 is xlCalculationManual
             pass # self.app.Calculation = -4135
             
-            self.wb = self.app.Workbooks.Open(self.workbook_path, UpdateLinks=0, ReadOnly=False)
+            self.wb = self.app.Workbooks.Open(
+                self.workbook_path,
+                UpdateLinks=0,
+                ReadOnly=True,  # Crucial: allows multiple workers, prevents 0x800A03EC lock conflict
+                IgnoreReadOnlyRecommended=True,
+                CorruptLoad=1  # Suppresses 'We found a problem with some content' repair prompts
+            )
             self.app.Calculation = -4135
             self.sheet_name = self.config.get('sheet', 'Sheet1')
             self.input_map = {
